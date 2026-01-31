@@ -1,8 +1,8 @@
-RAG 실무 시스템 아키텍처 (Enterprise Grade)
+#RAG 실무 시스템 아키텍처 (Enterprise Grade)
 
 본 아키텍처는 rag_evaluation_guide.md에서 다룬 지연 시간(Latency), 보안(Security), 평가(Evaluation)를 모두 고려한 설계입니다.
 
-1. 전체 시스템 흐름도 (Workflow)
+##1. 전체 시스템 흐름도 (Workflow)
 
 사용자의 요청부터 답변 생성, 그리고 사후 평가까지의 전체 흐름입니다.
 
@@ -24,7 +24,7 @@ LLM Generation: 최적화된 Context를 포함한 프롬프트로 답변 생성 
 
 Observability & Eval: 모든 로그를 DB에 저장하고, 주기적으로 RAGAS 평가 수행.
 
-2. 상세 컴포넌트 설계
+##2. 상세 컴포넌트 설계
 
 ① 데이터 인베스티션 파이프라인 (Data Ingestion - Async)
 
@@ -54,13 +54,13 @@ Feedback Loop: 사용자가 누른 '좋아요/싫어요' 데이터를 Ground Tru
 
 Guardrails: Llama Guard 등을 배치하여 부적절한 입력/출력 차단 (보안).
 
-3. 엔지니어링 의사결정 (Trade-offs)
+##3. 엔지니어링 의사결정 (Trade-offs)
 
 Latency vs Accuracy: 리랭커(Re-ranker)를 사용하면 정확도는 올라가지만 응답 속도가 0.5~1초 늦어집니다. 본 아키텍처는 정확도가 중요한 '기술 문서 상담'에 최적화하여 리랭커를 포함합니다.
 
 Cost Efficiency: 모든 질문에 GPT-4를 쓰지 않고, 난이도가 낮은 질문은 GPT-4o-mini나 로컬 모델로 라우팅하여 비용을 최적화합니다.
 
-4. 기술 스택 (Proposed Stack)
+##4. 기술 스택 (Proposed Stack)
 
 Frontend: React, Tailwind CSS (출처 하이라이팅 및 스트리밍 UI)
 
