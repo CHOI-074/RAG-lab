@@ -1,0 +1,15 @@
+# 가상환경
+venv/
+
+# Python 캐시
+__pycache__/
+*.pyc
+
+# 환경변수 / 비밀키
+.env
+
+# Streamlit secrets (혹시 secrets.toml 있으면)
+.streamlit/secrets.toml
+
+# 임시 파일
+temp.pdf
