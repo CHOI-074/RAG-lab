@@ -1,77 +1,173 @@
-# RAG 실무 시스템 아키텍처 (Enterprise Grade)
+# 금융 문서 RAG 챗봇 (Financial Document RAG Chatbot)
 
-본 아키텍처는 rag_evaluation_guide.md에서 다룬 지연 시간(Latency), 보안(Security), 평가(Evaluation)를 모두 고려한 설계입니다.
-* * *
+> PDF로 된 금융 문서를 업로드하면, 문서 내용을 근거로 질문에 답해주는 RAG 기반 챗봇입니다.
+> 사업보고서·약관·리포트처럼 길고 복잡한 금융 문서에서 원하는 정보를 빠르게 찾는 것을 목표로 합니다.
 
-## 1. 전체 시스템 흐름도 (Workflow)
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)
+![FAISS](https://img.shields.io/badge/FAISS-VectorStore-009688)
+![Gemini](https://img.shields.io/badge/Gemini-2.5--flash-4285F4?logo=google&logoColor=white)
 
-사용자의 요청부터 답변 생성, 그리고 사후 평가까지의 전체 흐름입니다.
+<br>
 
-User Request: React 프론트엔드에서 질문 전달.
+## 데모
 
-API Gateway (FastAPI): 요청 수신 및 사용자 인증(Auth) 확인.
+> 실행 화면을 캡처해서 아래에 넣어주세요. (예: `assets/demo.png` 또는 GIF)
 
-Hybrid Retrieval Layer:
+```
+여기에 데모 스크린샷 / GIF 삽입
+```
 
-Vector DB (Chroma/Pinecone): 시맨틱 검색 수행.
+<br>
 
-Elasticsearch/BM25: 키워드 기반 검색 동시 수행.
+## 주요 기능
 
-RRF(Reciprocal Rank Fusion): 두 검색 결과를 최적으로 병합.
+- **PDF 업로드 & 파싱** — 금융 문서 PDF를 업로드하면 텍스트를 추출해 검색 가능한 형태로 변환합니다.
+- **의미 기반 검색 (Semantic Search)** — 단순 키워드가 아니라 문장의 의미로 관련 내용을 찾아옵니다.
+- **근거 기반 답변 생성** — 검색된 문서 청크를 컨텍스트로 넣어, 환각(hallucination)을 줄인 답변을 생성합니다.
+- **청크 사이즈 실험** — 청크 크기(300 / 500 / 800)에 따른 검색 품질 차이를 비교·분석합니다.
 
-Re-ranking Stage: 상위 후보군을 Cross-Encoder 모델로 재정렬 (정확도 극대화).
+<br>
 
-LLM Generation: 최적화된 Context를 포함한 프롬프트로 답변 생성 (Streaming 적용).
+## 기술 스택
 
-Observability & Eval: 모든 로그를 DB에 저장하고, 주기적으로 RAGAS 평가 수행.
-* * *
+|구분          |사용 기술                                                     |
+|------------|----------------------------------------------------------|
+|**Language**|Python 3.10+                                              |
+|**문서 처리**   |pypdf                                                     |
+|**임베딩**     |sentence-transformers (`all-MiniLM-L6-v2`)                |
+|**벡터 검색**   |FAISS                                                     |
+|**LLM**     |Google Gemini API (`gemini-2.5-flash`, `google-genai` SDK)|
+|**UI**      |Streamlit                                                 |
 
-## 2. 상세 컴포넌트 설계
+<br>
 
-1. 데이터 인베스티션 파이프라인 (Data Ingestion - Async)
+## 프로젝트 구조
 
-Trigger: 관리자가 새 매뉴얼(PDF) 업로드.
+```
+financial-rag-chatbot/
+├── app.py                # Streamlit 챗봇 UI (메인 실행 파일)
+├── document_loader.py    # PDF 로딩 및 텍스트 추출 (pypdf)
+├── embedder.py           # 문서 청크 임베딩 + FAISS 인덱싱
+├── generator.py          # 검색 컨텍스트 기반 답변 생성 (Gemini)
+├── chunk_experiment.py   # 청크 사이즈(300/500/800) 비교 실험
+├── requirements.txt      # 의존성 목록
+└── sample.pdf            # 데모용 샘플 PDF
+```
 
-Worker (Celery/Redis): 업로드된 파일을 백그라운드에서 처리.
+> 파일별 역할이 위 설명과 다르면 본인 코드에 맞게 한 줄씩 수정해주세요.
 
-Unstructured 라이브러리로 텍스트/표 추출.
+<br>
 
-RecursiveCharacterTextSplitter로 전략적 청킹 (Overlap 15% 적용).
+## 동작 흐름 (Pipeline)
 
-벡터 DB 증분 업데이트 (Incremental Update).
+```
+PDF 업로드
+   │
+   ▼
+[document_loader] 텍스트 추출 → 청크 분할
+   │
+   ▼
+[embedder] 청크 임베딩 → FAISS 인덱스 저장
+   │
+   ▼
+사용자 질문 입력
+   │
+   ▼
+질문 임베딩 → FAISS 유사도 검색 (Top-k 청크)
+   │
+   ▼
+[generator] 검색된 청크 + 질문 → Gemini → 답변 생성
+```
 
-2. 서빙 레이어 (Serving Layer - Backend)
+<br>
 
-Streaming API: LangChain의 astream 기능을 사용하여 첫 토큰 지연 시간(TTFT) 최소화.
+## 실행 방법
 
-Prompt Management: 프롬프트 버전을 관리하여 특정 버전에서 RAGAS 점수가 어떻게 변하는지 추적.
+### 1. 레포 클론
 
-Cache (Redis): 동일하거나 유사한 질문에 대해 모델 호출 없이 즉시 답변 (비용 절감).
+```bash
+git clone https://github.com/CHOI-074/RAG-lab.git
+cd RAG-lab
+```
 
-3. 평가 및 모니터링 레이어 (MLOps)
+### 2. 가상환경 생성 및 활성화
 
-Evaluation Loop: 릴리즈 전 혹은 주기적으로 RAGAS를 가동하여 성능 지표 리포트 생성.
+```bash
+# 가상환경 생성
+python -m venv venv
 
-Feedback Loop: 사용자가 누른 '좋아요/싫어요' 데이터를 Ground Truth 데이터셋 구축에 활용.
+# 활성화 (Windows / PowerShell)
+venv\Scripts\Activate.ps1
 
-Guardrails: Llama Guard 등을 배치하여 부적절한 입력/출력 차단 (보안).
-* * *
+# 활성화 (Mac / Linux)
+source venv/bin/activate
+```
 
-## 3. 엔지니어링 의사결정 (Trade-offs)
+### 3. 의존성 설치
 
-Latency vs Accuracy: 리랭커(Re-ranker)를 사용하면 정확도는 올라가지만 응답 속도가 0.5~1초 늦어집니다. 본 아키텍처는 정확도가 중요한 '기술 문서 상담'에 최적화하여 리랭커를 포함합니다.
+```bash
+pip install -r requirements.txt
+```
 
-Cost Efficiency: 모든 질문에 GPT-4를 쓰지 않고, 난이도가 낮은 질문은 GPT-4o-mini나 로컬 모델로 라우팅하여 비용을 최적화합니다.
-* * *
+### 4. 환경변수 설정
 
-## 4. 기술 스택 (Proposed Stack)
+프로젝트 루트에 `.env` 파일을 만들고 본인의 Gemini API 키를 입력하세요.
 
-Frontend: React, Tailwind CSS (출처 하이라이팅 및 스트리밍 UI)
+```env
+GEMINI_API_KEY=your_api_key_here
+```
 
-Backend: FastAPI (비동기 처리 최적화)
+> Gemini API 키는 [Google AI Studio](https://aistudio.google.com/apikey)에서 발급받을 수 있습니다.
 
-AI Framework: LangChain, RAGAS
+### 5. 실행
 
-Vector DB: ChromaDB (로컬 개발) -> Pinecone (운영 배포)
+```bash
+streamlit run app.py
+```
 
-Model: OpenAI gpt-4o, BGE-Reranker (리랭킹용 오픈소스 모델)
+<br>
+
+## 청크 사이즈 실험
+
+RAG 성능에 큰 영향을 주는 변수인 **청크 사이즈**를 직접 비교 실험했습니다.
+동일한 PDF를 `chunk_size`만 바꾸고(overlap=50 고정), **같은 질문**으로 상위 3개 청크를 검색해 비교했습니다.
+
+|chunk_size|청크 개수 |평균 길이  |검색 품질                        |
+|:--------:|:----:|:-----:|:----------------------------|
+|300       |34    |294    |잘게 쪼개져 상위에 서로 다른 주제가 섞임 · 단편적|
+|**500**   |**19**|**487**|**1순위에 핵심 본문이 잡힘 · 균형 최적**   |
+|800       |12    |742    |상위가 목차에 치우치고 노이즈 증가          |
+
+같은 질문·같은 문서인데 300과 800은 1순위로 **목차 헤더**가 잡힌 반면, 500만 유일하게 1순위에 **실제 핵심 본문**이 검색됐습니다.
+
+> **결론 — 이 문서에서는 `chunk_size = 500`이 최적.**
+> 세 조건 중 유일하게 가장 관련 높은 본문을 검색 1순위로 잡았습니다.
+> (단, 문서 밀도·구조에 따라 최적값은 달라질 수 있습니다.)
+
+### 예상 못 한 인사이트: 청크보다 PDF 전처리
+
+검색 결과에 목차 번호·전화번호·아이콘 텍스트 같은 **레이아웃 노이즈**가 계속 섞여 들어왔습니다.
+디자인된 발간물 PDF라 본문 외 텍스트가 그대로 추출된 것인데, 청크 사이즈를 아무리 튜닝해도 추출 텍스트 자체에 노이즈가 많으면 검색 품질에 한계가 있었습니다.
+
+> **청크 사이즈만큼이나 PDF 전처리(노이즈 제거)도 중요하다** — 이번 실험의 가장 큰 배움이었습니다.
+
+> 자세한 분석 과정은 [블로그 글](#)에 정리했습니다. *(Velog 링크 추가)*
+
+<br>
+
+## 향후 개선 방향
+
+- [ ] 검색 방식 개선 (Hybrid Search: 키워드 + 의미 검색 결합)
+- [ ] Re-ranking 단계 추가로 검색 정확도 향상
+- [ ] 멀티 문서 동시 검색 지원
+- [ ] 답변에 출처(페이지·청크) 표시 기능
+
+<br>
+
+## 작성자
+
+**최창연 (CHOI-074)**
+
+- GitHub: [@CHOI-074](https://github.com/CHOI-074)
+- 도메인 관심사: 금융 · 데이터 분석 · AI
