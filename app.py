@@ -12,7 +12,7 @@ def load_model():
         return get_model()
 
 model = load_model()
-st.caption("준비 완료 ✅ 아래에서 PDF를 올리세요")
+st.caption("준비 완료 아래에서 PDF를 올리세요")
 
 uploaded = st.file_uploader("PDF 업로드", type="pdf")
 if uploaded:
