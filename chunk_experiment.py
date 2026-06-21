@@ -4,7 +4,7 @@ from embedder import get_model, build_index, search
 text = load_pdf("sample.pdf")
 model = get_model()
 
-query = "이 문서의 주요 내용은?"   # ← 실제로 궁금한 질문으로 바꾸세요
+query = "이 문서의 주요 내용은?"   
 
 for size in [300, 500, 800]:
     chunks = chunk_text(text, chunk_size=size, overlap=50)
